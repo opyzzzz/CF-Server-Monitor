@@ -8,7 +8,7 @@ export async function sendTelegramNotification(sys, msg) {
       body: JSON.stringify({
         chat_id: sys.tg_chat_id,
         text: msg,
-        parse_mode: 'HTML'
+        parse_mode: 'Markdown'  // 改为 Markdown
       })
     });
   } catch (e) {
@@ -24,8 +24,8 @@ export async function sendWeworkNotification(sys, msg) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        msgtype: "text",
-        text: { content: msg }
+        msgtype: "markdown",  // 改为 markdown
+        markdown: { content: msg }  // 改为 markdown 字段
       })
     });
   } catch (e) {
@@ -62,10 +62,10 @@ export async function checkOfflineNodes(db, sys) {
       const isOffline = diff > 120000;
 
       if (isOffline && !alertState[s.id]) {
-        const msg = `⚠️ <b>节点离线告警</b>\n\n` +
-          `<b>节点名称:</b> ${s.name}\n` +
-          `<b>状态:</b> 离线 (超过2分钟未上报)\n` +
-          `<b>时间:</b> ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}`;
+        const msg = `⚠️ **节点离线告警**\n\n` +
+          `**节点名称:** ${s.name}\n` +
+          `**状态:** 离线 (超过2分钟未上报)\n` +
+          `**时间:** ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}`;
         
         await sendTelegramNotification(sys, msg);
         await sendWeworkNotification(sys, msg);
@@ -73,10 +73,10 @@ export async function checkOfflineNodes(db, sys) {
         alertState[s.id] = true;
         stateChanged = true;
       } else if (!isOffline && alertState[s.id]) {
-        const msg = `✅ <b>节点恢复通知</b>\n\n` +
-          `<b>节点名称:</b> ${s.name}\n` +
-          `<b>状态:</b> 恢复在线\n` +
-          `<b>时间:</b> ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}`;
+        const msg = `✅ **节点恢复通知**\n\n` +
+          `**节点名称:** ${s.name}\n` +
+          `**状态:** 恢复在线\n` +
+          `**时间:** ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}`;
         
         await sendTelegramNotification(sys, msg);
         await sendWeworkNotification(sys, msg);
