@@ -74,15 +74,12 @@ export async function handleWebSocketUpgrade(request, env) {
   }
 
   const url = new URL(request.url);
-  // 透传 query 让 DO 读取 subscribe 参数
   const qs = url.search || '';
   try {
     const id = env.METRICS_BROADCASTER.idFromName('global');
     const stub = env.METRICS_BROADCASTER.get(id);
-    return await stub.fetch(`http://internal/ws${qs}`, {
-      method: request.method,
-      headers: request.headers
-    });
+    // 使用原始 request 构造新的内部请求，保留 WebSocket 升级语义
+    return await stub.fetch(new Request(`http://internal/ws${qs}`, request));
   } catch (e) {
     console.error('[ws] DO upgrade failed:', e);
     return new Response(JSON.stringify({ error: 'WebSocket error', code: 500 }), {

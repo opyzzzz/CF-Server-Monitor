@@ -20,17 +20,6 @@ function parseAllowedOrigins(corsAllowedOrigins) {
     .filter(o => o !== '');
 }
 
-function isOriginAllowed(origin, allowedOrigins) {
-  return true;
-  // if (!allowedOrigins || allowedOrigins.length === 0) {
-  //   return true;
-  // }
-  // if (!origin) {
-  //   return true;
-  // }
-  // return allowedOrigins.includes(origin);
-}
-
 export class MetricsBroadcaster {
   constructor(state, env) {
     this.state = state;
@@ -115,13 +104,6 @@ export class MetricsBroadcaster {
       
       const origin = request.headers.get('Origin');
       const allowedOrigins = parseAllowedOrigins(this.env.CORS_ALLOWED_ORIGINS);
-      
-      if (!isOriginAllowed(origin, allowedOrigins)) {
-        return new Response(JSON.stringify({ error: 'Origin not allowed', code: 403 }), {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
       
       const scope = (url.searchParams.get('subscribe') || 'all').toLowerCase();
 

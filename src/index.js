@@ -176,10 +176,6 @@ export default {
       return false;
     };
 
-    if (path === '/api/ws') {
-      console.log('[DEBUG] /api/ws bypass check:', isTurnstileBypassed(path), 'path:', path);
-    }
-
     let setTurnstileCookie = false;
     let sys = null;
 
@@ -287,12 +283,14 @@ export default {
       }}
     ];
 
-    console.log('[DEBUG] About to check routes, method:', method, 'path:', path);
     for (const route of routes) {
       if (route.method === method && route.path === path) {
-        console.log('[DEBUG] Route matched:', method, path);
         const response = await route.handler();
-        console.log('[DEBUG] Route response status:', response.status);
+
+        // WebSocket 升级响应直接原样返回，不能修改 response 对象
+        if (response.status === 101) {
+          return response;
+        }
 
         if (setTurnstileCookie) {
           const expires = Math.floor(Date.now() / 1000) + 3600;
