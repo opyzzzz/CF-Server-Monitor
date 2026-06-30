@@ -335,7 +335,7 @@ Headers: Upgrade: websocket, Connection: Upgrade
 | 订阅类型 | 推送方式 | 消息类型 | 说明 |
 | -------- | ----- | ----- | --- |
 | `subscribe=all` | 批量合并，每 5 秒一次 | `batchUpdate` | 减少消息数量，降低前端渲染压力 |
-| `subscribe=<serverId>` | 实时推送 | `update` | 单台服务器详情页，低延迟 |
+| `subscribe=<serverId>` | 实时推送 | `batchUpdate` | 单台服务器详情页，低延迟，统一消息格式 |
 
 **消息格式**：
 
@@ -346,7 +346,6 @@ Headers: Upgrade: websocket, Connection: Upgrade
 | `subscribed` | S → C | `{ type: "subscribed", ts: number, subscribed: string, count: number }` |
 | `ping` | C → S | `{ type: "ping", ts: number }` |
 | `pong` | 双向 | `{ type: "pong", ts: number }` |
-| `update` | S → C | `{ type: "update", serverId: string, ts: number, data: Server }` |
 | `batchUpdate` | S → C | `{ type: "batchUpdate", ts: number, updates: Array<{serverId, ts, data}> }` |
 
 **示例（subscribe=all，带 ID 过滤）**：
@@ -377,8 +376,12 @@ ws.onmessage = (ev) => {
 const ws = new WebSocket('wss://status.example.com/api/ws?subscribe=server-001');
 ws.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
-  if (msg.type === 'update') {
-    updateServer(msg.serverId, msg.data);
+  if (msg.type === 'batchUpdate') {
+    for (const u of msg.updates) {
+      for (const s of u.samples) {
+        updateServer(u.serverId, s.data);
+      }
+    }
   }
 };
 ```
@@ -512,7 +515,7 @@ interface Settings {
 }
 
 interface WsMessage {
-  type: 'hello' | 'subscribe' | 'subscribed' | 'ping' | 'pong' | 'update' | 'batchUpdate';
+  type: 'hello' | 'subscribe' | 'subscribed' | 'ping' | 'pong' | 'batchUpdate';
   ts?: number;
   subscribed?: string;
   scope?: string;

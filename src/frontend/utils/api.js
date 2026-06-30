@@ -149,13 +149,6 @@ export const createLiveSocket = (subscribe, handlers = {}, apiIndex = 0, serverI
       } catch (_) { return }
       if (!msg) return
 
-      if (shouldReplay && msg.type === 'update') {
-        emitUpdate({
-          serverId: msg.serverId,
-          data: msg.data,
-          ts: msg.data?.sample_timestamp || msg.data?.last_updated || msg.data?.timestamp || msg.ts
-        })
-      }
       if (shouldReplay && msg.type === 'batchUpdate') {
         replayBatch(msg)
       }

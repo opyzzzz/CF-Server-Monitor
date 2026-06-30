@@ -244,25 +244,12 @@ export class MetricsBroadcaster {
 
   // 向所有匹配 scope 的 WebSocket 广播推送
   _broadcast(serverId, payload) {
-    const message = JSON.stringify({
-      type: 'update',
+    const ts = Date.now();
+    const updates = [{
       serverId,
-      ts: Date.now(),
-      data: payload
-    });
-
-    const websockets = this.state.getWebSockets();
-    for (const ws of websockets) {
-      const attachment = ws.deserializeAttachment();
-      if (!attachment || !this._shouldDeliver(attachment.scope, serverId, attachment.serverIds)) {
-        continue;
-      }
-      try {
-        ws.send(message);
-      } catch (_) {
-        // WebSocket 已异常关闭，DO 会自动清理
-      }
-    }
+      samples: [{ ts, data: payload }]
+    }];
+    this._broadcastBatch(updates);
   }
 
   // WebSocket 收到消息（ping 已被自动响应拦截，不会到达此处）
@@ -300,25 +287,16 @@ export class MetricsBroadcaster {
       const scopedUpdates = updates.filter(item => this._shouldDeliver(attachment.scope, item.serverId, attachment.serverIds));
       if (scopedUpdates.length === 0) continue;
 
-      const only = scopedUpdates.length === 1 ? scopedUpdates[0] : null;
-      const singleSample = only && only.samples.length === 1 ? only.samples[0] : null;
-      const message = singleSample
-        ? JSON.stringify({
-            type: 'update',
-            serverId: only.serverId,
-            ts,
-            data: singleSample.data
-          })
-        : JSON.stringify({
-            type: 'batchUpdate',
-            ts,
-            updates: scopedUpdates
-          });
+      const message = JSON.stringify({
+        type: 'batchUpdate',
+        ts,
+        updates: scopedUpdates
+      });
 
       try {
         ws.send(message);
       } catch (_) {
-        // WebSocket 宸插紓甯稿叧闂紝DO 浼氳嚜鍔ㄦ竻鐞?
+        // WebSocket 已异常关闭，DO 会自动清理
       }
     }
   }

@@ -323,7 +323,7 @@ CORS_ALLOWED_ORIGINS=https://status.example.com,https://admin.example.com
 **副作用**
 
 1. `metrics_history` 只写入本次请求中最新的一个样本，避免 1 秒采集时放大 D1 写入次数。
-2. 触发 Durable Object `MetricsBroadcaster` 内部广播。单样本会发送 `{type:"update", serverId, ts, data}`；多样本会发送 `{type:"batchUpdate", ts, updates:[...]}`，前端按样本时间逐个回放。
+2. 触发 Durable Object `MetricsBroadcaster` 内部广播，统一发送 `{type:"batchUpdate", ts, updates:[...]}` 格式，前端按样本时间逐个回放。
 3. 写入 `request.cf.country`（或 `cf-ipcountry` Header）作为该条记录的 `region` 字段（统一转大写）。
 
 ***
@@ -576,7 +576,7 @@ Sec-WebSocket-Version: 13
 | 订阅类型 | 推送方式 | 消息类型 | 说明 |
 | -------- | ----- | ----- | --- |
 | `subscribe=all` | 批量合并，每 5 秒一次 | `batchUpdate` | 减少消息数量，降低前端渲染压力 |
-| `subscribe=<serverId>` | 实时推送 | `update` | 单台服务器详情页，低延迟 |
+| `subscribe=<serverId>` | 实时推送 | `batchUpdate` | 单台服务器详情页，低延迟，统一消息格式 |
 
 > `subscribe=all` 默认不推送任何服务器更新。客户端应先调用 `/api/servers` 获取当前可见服务器列表，再通过 WebSocket 通道发送 `subscribe` 消息，使用 `servers[].id` 作为过滤列表。该过滤是客户端订阅范围控制，不是服务端鉴权。
 
@@ -586,16 +586,7 @@ Sec-WebSocket-Version: 13
    ```json
    { "type": "hello", "ts": 1737638400000, "subscribed": "all" }
    ```
-2. 指标更新——实时（`subscribe=<serverId>` 时使用）
-   ```json
-   {
-     "type": "update",
-     "serverId": "9b2c...",
-     "ts": 1737638400000,
-     "data": { /* 见 Server 对象(已 merge metrics) */ }
-   }
-   ```
-3. 指标更新——批量（`subscribe=all` 时使用，每 5 秒合并一次）
+2. 指标更新（统一使用 `batchUpdate`，`subscribe=all` 和 `subscribe=<serverId>` 均支持）
    ```json
    {
      "type": "batchUpdate",
@@ -679,8 +670,12 @@ ws.onmessage = (ev) => {
 const ws = new WebSocket('wss://status.example.com/api/ws?subscribe=server-001');
 ws.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
-  if (msg.type === 'update') {
-    updateServer(msg.serverId, msg.data);
+  if (msg.type === 'batchUpdate') {
+    for (const u of msg.updates) {
+      for (const s of u.samples) {
+        updateServer(u.serverId, s.data);
+      }
+    }
   }
 };
 ```
