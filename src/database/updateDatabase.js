@@ -3,6 +3,9 @@ export async function updateDatabase(db) {
   const results = [];
   
   try {
+    const historyIndex = await ensureHistoryIndex(db);
+    results.push({ name: 'metrics_history 索引检查', ...historyIndex });
+
     const migrateLoad = await migrateLoadToLoadAvg(db);
     results.push({ name: 'metrics_history load -> load_avg 迁移', ...migrateLoad });
     
@@ -41,6 +44,30 @@ export async function updateDatabase(db) {
       error: e.message,
       results
     };
+  }
+}
+
+// 确保 metrics_history 表有 idx_history_server_time 索引
+export async function ensureHistoryIndex(db) {
+  try {
+    const index = await db.prepare(
+      `SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='metrics_history' AND name='idx_history_server_time'`
+    ).first();
+
+    if (index) {
+      return { success: true, created: false, message: '索引已存在' };
+    }
+
+    await db.prepare(`DROP INDEX IF EXISTS idx_history_server_time`).run();
+    await db.prepare(`
+      CREATE INDEX idx_history_server_time
+      ON metrics_history(server_id, timestamp)
+    `).run();
+
+    return { success: true, created: true, message: '已创建索引' };
+  } catch (e) {
+    console.error('检查/创建 metrics_history 索引失败:', e);
+    return { success: false, error: e.message };
   }
 }
 
