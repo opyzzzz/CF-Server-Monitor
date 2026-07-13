@@ -508,6 +508,11 @@ apply_remote_config() {
     _cf_md5=$(awk 'tolower($1)=="x-agent-config-md5:" { gsub("\r", "", $2); print tolower($2); exit }' "$_cf_header_file")
     [ "${#_cf_md5}" -eq 32 ] || return 1
     case "$_cf_md5" in *[!0-9a-f]*) return 1 ;; esac
+
+    if [ "$_cf_md5" = "${CONFIG_MD5:-none}" ]; then
+        return 0
+    fi
+
     _cf_collect=$(printf '%s' "$_cf_body" | cut -d '&' -f 1); _cf_collect=${_cf_collect#collect_interval=}
     _cf_ping=$(printf '%s' "$_cf_body" | cut -d '&' -f 2); _cf_ping=${_cf_ping#ping_mode=}
     _cf_report=$(printf '%s' "$_cf_body" | cut -d '&' -f 3); _cf_report=${_cf_report#report_interval=}
@@ -545,6 +550,21 @@ apply_remote_config() {
     ACTIVE_INTERVAL="$REPORT_INTERVAL"
     [ "$COLLECT_INTERVAL" -gt 0 ] && ACTIVE_INTERVAL="$COLLECT_INTERVAL"
     log_info "Dynamic configuration applied: md5=${CONFIG_MD5} ct=${CT_NODE:-} cu=${CU_NODE:-} cm=${CM_NODE:-} bd=${BD_NODE:-}"
+
+    if kill -0 "$WORKER_PID" 2>/dev/null; then
+        pkill -P "$WORKER_PID" 2>/dev/null || true
+        kill "$WORKER_PID" 2>/dev/null || true
+        wait "$WORKER_PID" 2>/dev/null || true
+    fi
+    run_network_worker &
+    WORKER_PID=$!
+
+    if [ "$COLLECT_INTERVAL" -gt 0 ]; then
+        SAMPLES_JSON=""
+        SAMPLE_COUNT=0
+    fi
+    LAST_REPORT_TIME=0
+
     if [ -n "$_cf_rx_corr" ] || [ -n "$_cf_tx_corr" ]; then
         if apply_traffic_correction "$_cf_rx_corr" "$_cf_tx_corr"; then
             send_correction_confirm "$_cf_rx_corr" "$_cf_tx_corr" || true
@@ -836,7 +856,8 @@ write_probe_result() {
     local dest="$1"
     shift
     local tmp="${dest}.tmp"
-    if "$@" > "$tmp"; then
+    rm -f "$tmp"
+    if "$@" > "$tmp" 2>/dev/null && [ -f "$tmp" ]; then
         mv "$tmp" "$dest"
     else
         rm -f "$tmp" "$dest"
